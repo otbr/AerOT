@@ -79,9 +79,15 @@ public:
 	void AddItemId(const Item *item);
   void AddCreature(const Creature *creature, bool known, unsigned int remove);
 
-  int getMessageLength(){
-      return m_MsgSize;
-      }
+    int getMessageLength()
+    {
+        return m_MsgSize;
+    }
+
+    int getMessagePosition()
+    {
+        return m_ReadPos;
+    }
 
 	void JoinMessages(NetworkMessage &add);
 
