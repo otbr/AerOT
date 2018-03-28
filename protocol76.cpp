@@ -1206,12 +1206,11 @@ void Protocol76::parseThrow(NetworkMessage &msg)
 	unsigned short to_y       = msg.GetU16();
 	unsigned char  to_z       = msg.GetByte();
 	unsigned char count       = msg.GetByte();
-	/*
-	std::cout << "parseThrow: " << "from_x: " << (int)from_x << ", from_y: " << (int)from_y
-	<<  ", from_z: " << (int)from_z << ", item: " << (int)itemid << ", from_stack: "
-	<< (int)from_stack << " to_x: " << (int)to_x << ", to_y: " << (int)to_y
-	<<  ", to_z: " << (int)to_z
-	<< ", count: " << (int)count << std::endl;*/
+
+	if(itemid != 0 && count <= 0){
+		return;
+	}
+	
 	bool toInventory = false;
 	bool fromInventory = false;
 
