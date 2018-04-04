@@ -4618,7 +4618,7 @@ void Game::playerLookInTrade(Player* player, bool lookAtCounterOffer, int index)
 
 	if(foundItem) {
 		stringstream ss;
-		ss << "You see " << tradeItem->getDescription();
+		ss << "You see " << tradeItem->getDescription(true);
 		player->sendTextMessage(MSG_INFO, ss.str().c_str());
 	}
 }
