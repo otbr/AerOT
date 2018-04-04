@@ -3809,9 +3809,6 @@ void Game::checkCreature(unsigned long id)
 				return;
 			}
 
-#ifdef CVS_DAY_CYCLE
-			player->sendWorldLightLevel(lightlevel, 0xD7);
-#endif //CVS_DAY_CYCLE
 #ifdef TR_ANTI_AFK
 			player->checkAfk(thinkTicks);
 #endif //TR_ANTI_AF
@@ -4510,12 +4507,17 @@ void Game::playerAcceptTrade(Player* player)
 {
 	OTSYS_THREAD_LOCK_CLASS lockClass(gameLock, "Game::playerAcceptTrade()");
 
-	if(player->isRemoved)
+	if(player->isRemoved){
 		return;
+    }
+
+	if(!(player->tradeState == TRADE_ACKNOWLEDGE || player->tradeState == TRADE_INITIATED)){
+		return;
+	}
 
 	player->setAcceptTrade(true);
-	Player *tradePartner = getPlayerByID(player->tradePartner);
-	if(tradePartner && tradePartner->getAcceptTrade()) {
+	Player* tradePartner = getPlayerByID(player->tradePartner);
+	if(tradePartner && tradePartner->getAcceptTrade()){
 		Item *tradeItem1 = player->tradeItem;
 		Item *tradeItem2 = tradePartner->tradeItem;
 
@@ -4584,23 +4586,25 @@ void Game::playerLookInTrade(Player* player, bool lookAtCounterOffer, int index)
 	}
 
 	Container *tradeContainer = dynamic_cast<Container*>(tradeItem);
-	if(!tradeContainer || index > tradeContainer->getItemHoldingCount())
+	if(!tradeContainer || (index > (int32_t)tradeContainer->getItemHoldingCount())){
 		return;
+    }
 
 	bool foundItem = false;
-	std::list<const Container*> stack;
-	stack.push_back(tradeContainer);
-
+	std::list<const Container*> listContainer;
 	ContainerList::const_iterator it;
+    Container* tmpContainer = NULL;
 
-	while(!foundItem && stack.size() > 0) {
-		const Container *container = stack.front();
-		stack.pop_front();
+	listContainer.push_back(tradeContainer);
 
-		for (it = container->getItems(); it != container->getEnd(); ++it) {
-			Container *container = dynamic_cast<Container*>(*it);
-			if(container) {
-				stack.push_back(container);
+	while(!foundItem && listContainer.size() > 0) {
+		const Container *container = listContainer.front();
+		listContainer.pop_front();
+
+		for(it = container->getItems(); it != container->getEnd(); ++it){
+            tmpContainer = dynamic_cast<Container*>(*it);
+			if(tmpContainer){
+				listContainer.push_back(tmpContainer);
 			}
 
 			--index;
@@ -4614,7 +4618,7 @@ void Game::playerLookInTrade(Player* player, bool lookAtCounterOffer, int index)
 
 	if(foundItem) {
 		stringstream ss;
-		ss << "You see " << tradeItem->getDescription(true);
+		ss << "You see " << tradeItem->getDescription();
 		player->sendTextMessage(MSG_INFO, ss.str().c_str());
 	}
 }
@@ -4623,6 +4627,10 @@ void Game::playerCloseTrade(Player* player)
 {
 	OTSYS_THREAD_LOCK_CLASS lockClass(gameLock, "Game::playerCloseTrade()");
 
+	if(player->isRemoved){
+		return;
+    }
+	
 	Player* tradePartner = getPlayerByID(player->tradePartner);
 
 	std::vector<Item*>::iterator it;
@@ -6135,6 +6143,7 @@ void Game::creatureChangeLight(Player* player, int time, unsigned char lightleve
 void Game::checkLight(int t)
 {
 	OTSYS_THREAD_LOCK_CLASS lockClass(gameLock, "Game::checkLight()");
+
 	addEvent(makeTask(10000, boost::bind(&Game::checkLight, this, 10000)));
 
 	light_hour = light_hour + light_hour_delta;
@@ -6149,13 +6158,18 @@ void Game::checkLight(int t)
 	}
 
 	int newlightlevel = lightlevel;
+	bool lightChange = false;
 	switch(light_state){
-	case LIGHT_STATE_SUNRISE:
-		newlightlevel += (LIGHT_LEVEL_DAY - LIGHT_LEVEL_NIGHT)/30;
-		break;
-	case LIGHT_STATE_SUNSET:
-		newlightlevel -= (LIGHT_LEVEL_DAY - LIGHT_LEVEL_NIGHT)/30;
-		break;
+    	case LIGHT_STATE_SUNRISE:
+    		newlightlevel += (LIGHT_LEVEL_DAY - LIGHT_LEVEL_NIGHT)/30;
+    		lightChange = true;
+    		break;
+    	case LIGHT_STATE_SUNSET:
+    		newlightlevel -= (LIGHT_LEVEL_DAY - LIGHT_LEVEL_NIGHT)/30;
+    		lightChange = true;
+    		break;
+   		default:
+            break;
 	}
 
 	if(newlightlevel <= LIGHT_LEVEL_NIGHT){
@@ -6166,9 +6180,16 @@ void Game::checkLight(int t)
 		lightlevel = LIGHT_LEVEL_DAY;
 		light_state = LIGHT_STATE_DAY;
 	}
-	else{
+	else
+    {
 		lightlevel = newlightlevel;
 	}
+	
+	if(lightChange){
+ 		for(AutoList<Player>::listiterator it = Player::listPlayer.list.begin(); it != Player::listPlayer.list.end(); ++it){
+			(*it).second->sendWorldLightLevel(lightlevel, 0xD7);
+		}
+    }
 }
 
 unsigned char Game::getLightLevel(){
